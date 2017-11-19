@@ -7,28 +7,36 @@ sfrbox.py -- box sfr interface v3.4
 Ce script permet d'afficher certains paramètres de la box, de la redemarrer
 ou d'allumer/éteindre les leds
 
-synopsis:
+Synopsis:
     sfrbox.py -led on
     sfrbox.py -i -c -led on
     sfrbox.py -r
 
-voir sfrbox.py -h pour l"ensemble des commandes
+voir sfrbox.py -h pour l'ensemble des commandes
 
 Configuration:
-Remplacer la valeur dans KEY par la clé wifi de la box.
+    - Remplacer la valeur dans KEY par la clé wifi de la box.
+    - Vérifier que l'ip dans URL soit la bonne
+
+Modules requis:
+    pyquery
+    requests
+
+From:
+    https://github.com/1shad/sfrbox-python
 
 """
-
-import argparse
+import sys
 import hmac
+import argparse
 from hashlib import sha256
-from bs4 import BeautifulSoup
+from pyquery import PyQuery as pq
 from requests import Session
-from sys import exit
 
-KEY = '0x0x0x0x0x0x0x0x0x0x'
 
-URL = 'http://192.168.1.1/'
+KEY = '0x0x0x0x0x0x0x0x0x0x' # <-- Clé wifi
+URL = 'http://192.168.1.1/'  # <-- IP
+
 session = Session()
 
 #_______/ LED \______________________________________________________
@@ -66,14 +74,13 @@ def connected():
     
     response = session.get( URL + 'network' )
     if response.status_code != 200:
-        exit( "Impossible de charger la page")
+        sys.exit( "Impossible de charger la page")
 
-    soup = BeautifulSoup( response.content, 'lxml' )
+    d = pq( response.content );
 
-    nodes = soup.select('#network_clients > tbody > tr')
-    nodes = [ x.find_all('td') for x in nodes ]
+    nodes = d('#network_clients > tbody > tr')
+    nodes = [ x.find('td') for x in nodes.items() ]
     nodes = [ [ x.text.replace('\n', '').strip() for x in y ] for y in nodes ]
-    
     for e in nodes:
         print(e[0] + ':', e[3], e[2], e[1], e[4])
     
@@ -83,18 +90,18 @@ def infos():
     response = session.get( URL )
 
     if response.status_code != 200:
-        exit("Impossible d'ouvrir:", URL)
+        sys.exit("Impossible d'ouvrir:", URL)
 
-    soup = BeautifulSoup(response.content, 'lxml')
+    d = pq( response.content );
 
-    for info in soup.select('#infos tr'):
-        th = info.find('th').text.strip()
-        td = info.find('td').text.replace('\n','')
+    for info in d('#infos tr').items():
+        th = info.find('th').text().strip()
+        td = info.find('td').text().replace('\n','')
         print( th, td )
 
-    for node in soup.select('#wan_status,#modem_uptime'):
-        text = node.find_previous('th').text + ' : '
-        text += node.text.replace('\n', '').strip()
+    for node in d('#wan_status,#modem_uptime').items():
+        text = node.prev('th').text() + ' : '
+        text += node.text().replace('\n', '').strip()
         print( text )
 
 #_______/ LOGIN \____________________________________________________
@@ -105,10 +112,11 @@ def login():
 
     response = session.post(URL + 'login', headers=headers, data=data)
     if response.status_code != 200:
-        exit("login(): Impossible de récuperer le challenge")
+        sys.exit("login(): Impossible de récuperer le challenge")
 
-    soup = BeautifulSoup(response.content, 'lxml')
-    challenge = soup.find('challenge').text.encode('utf-8')
+    #response.encoding = 'utf-8'
+    d = pq( response.content );
+    challenge = d.find('challenge').text().encode('utf-8')
 
     hash1 = sha256('admin'.encode('utf-8')).hexdigest().encode('utf-8')
     hash1 = hmac.new(challenge, hash1, sha256).hexdigest()
@@ -125,7 +133,7 @@ def login():
 
     response = session.post( URL + 'login', data=data )
     if response.status_code != 200:
-        exit("login(): Impossible de se connecter")
+        sys.exit("login(): Impossible de se connecter")
 
 #_______/ MAIN \_____________________________________________________
 
@@ -135,6 +143,10 @@ parser.add_argument('-i', '--infos', action="store_true" )
 parser.add_argument('-c', '--connected', action="store_true" )
 parser.add_argument('-l', '--led', choices=['on', 'off'] )
 parser.add_argument('-r', '--reboot', action="store_true" )
+
+if len(sys.argv) < 2:
+    parser.print_help()
+    sys.exit(0)
 
 args = parser.parse_args()
 
