@@ -76,7 +76,7 @@ def connected():
     if response.status_code != 200:
         sys.exit( "Impossible de charger la page")
 
-    d = pq( response.content );
+    d = pq( response.content )
 
     nodes = d('#network_clients > tbody > tr')
     nodes = [ x.find('td') for x in nodes.items() ]
@@ -92,7 +92,7 @@ def infos():
     if response.status_code != 200:
         sys.exit("Impossible d'ouvrir:", URL)
 
-    d = pq( response.content );
+    d = pq( response.content )
 
     for info in d('#infos tr').items():
         th = info.find('th').text().strip()
@@ -114,8 +114,7 @@ def login():
     if response.status_code != 200:
         sys.exit("login(): Impossible de récuperer le challenge")
 
-    #response.encoding = 'utf-8'
-    d = pq( response.content );
+    d = pq( response.content )
     challenge = d.find('challenge').text().encode('utf-8')
 
     hash1 = sha256('admin'.encode('utf-8')).hexdigest().encode('utf-8')
